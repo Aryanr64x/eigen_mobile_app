@@ -1,15 +1,21 @@
+// import 'dart:ffi';
+
 class Profile {
   final String id;
   final String username;
   final String email;
   final String? avatarUrl;
   final String createdAt;
+  final int rating;
+  final String? school;
 
   const Profile({
     required this.id,
     required this.username,
     required this.email,
     required this.createdAt,
+    required this.rating,
+    this.school,
     this.avatarUrl,
   });
 
@@ -19,6 +25,9 @@ class Profile {
         email: json['email'] as String,
         createdAt: json['created_at'] as String,
         avatarUrl: json['avatar_url'] as String?,
+        rating: json['rating'] as int,
+        school: json['school'] as String?,
+        
       );
 
   Profile copyWith({
@@ -26,7 +35,9 @@ class Profile {
     String? username,
     String? email,
     String? createdAt,
+    int? rating,
     String? avatarUrl,
+    String? school
   }) =>
       Profile(
         id: id ?? this.id,
@@ -34,6 +45,8 @@ class Profile {
         email: email ?? this.email,
         createdAt: createdAt ?? this.createdAt,
         avatarUrl: avatarUrl ?? this.avatarUrl,
+        rating: rating ?? this.rating,
+        school: school ?? this.school
       );
 
   @override

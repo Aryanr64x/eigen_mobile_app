@@ -76,6 +76,8 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
         'email': profile.email,
         'avatar_url': profile.avatarUrl,
         'created_at': profile.createdAt,
+        'school': profile.school,
+        'rating':profile.rating
       };
 }
 

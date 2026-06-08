@@ -3,6 +3,8 @@ import 'package:eigen_flutter/screens/auth.dart' show AuthScreen;
 import 'package:eigen_flutter/screens/home.dart';
 import 'package:eigen_flutter/screens/main.dart';
 import 'package:eigen_flutter/screens/question_screen.dart';
+import 'package:eigen_flutter/screens/single_contest_questions_screen.dart';
+import 'package:eigen_flutter/screens/single_contest_screen.dart';
 import 'package:eigen_flutter/storage/storage_provider.dart';
 import 'package:eigen_flutter/storage/storage_service.dart';
 import 'package:flutter/material.dart';
@@ -43,6 +45,21 @@ class MainApp extends ConsumerWidget {
             builder: (_) => QuestionScreen(questionId: questionId),
           );
         }
+
+                // inside onGenerateRoute, add alongside /contest:
+        if (settings.name == '/contest-questions') {
+          final contestId = settings.arguments as int;
+          return MaterialPageRoute(
+            builder: (_) => ContestQuestionsScreen(contestId: contestId),
+          );
+        }
+
+        if (settings.name == '/contest') {
+            final contestId = settings.arguments as int;
+            return MaterialPageRoute(
+              builder: (_) => SingleContestScreen(contestId: contestId),
+            );
+          }
         // Static routes
         switch (settings.name) {
           case '/home':
@@ -52,6 +69,12 @@ class MainApp extends ConsumerWidget {
                 builder: (_) => AuthScreen(initialMode: 'signup'));
           case '/main':
             return MaterialPageRoute(builder: (_) => const MainScreen());
+          case '/contest-questions':
+              return MaterialPageRoute(
+                builder: (_) => const Scaffold(
+                  body: Center(child: Text('Contest questions coming soon')),
+                ),
+              );
           default:
             return MaterialPageRoute(
               builder: (_) => const Scaffold(

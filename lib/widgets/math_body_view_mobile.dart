@@ -1,0 +1,91 @@
+import 'package:flutter/material.dart';
+import 'package:webview_flutter/webview_flutter.dart';
+
+class MathBodyView extends StatefulWidget {
+  final String htmlBody;
+  const MathBodyView({super.key, required this.htmlBody});
+
+  @override
+  State<MathBodyView> createState() => _MathBodyViewState();
+}
+
+class _MathBodyViewState extends State<MathBodyView> {
+  late final WebViewController _controller;
+  bool _loaded = false;
+  double _height = 200;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..addJavaScriptChannel('FlutterHeight', onMessageReceived: (msg) {
+        final h = double.tryParse(msg.message);
+        if (h != null && mounted) setState(() => _height = h + 24);
+      })
+      ..setNavigationDelegate(NavigationDelegate(onPageFinished: (_) {
+        if (mounted) setState(() => _loaded = true);
+        Future.delayed(const Duration(milliseconds: 600), () {
+          _controller.runJavaScript(
+            "FlutterHeight.postMessage(document.body.scrollHeight.toString());",
+          );
+        });
+      }))
+      ..loadHtmlString(_buildHtml(widget.htmlBody));
+  }
+
+  String _buildHtml(String body) {
+    const mathJaxConfig = r"""
+      MathJax = {
+        tex: {
+          inlineMath: [['$', '$'], ['\\(', '\\)']],
+          displayMath: [['$$', '$$'], ['\\[', '\\]']]
+        },
+        svg: { fontCache: 'global' },
+        startup: {
+          ready() {
+            MathJax.startup.defaultReady();
+            MathJax.startup.promise.then(() => {
+              FlutterHeight.postMessage(document.body.scrollHeight.toString());
+            });
+          }
+        }
+      };
+    """;
+    return '''
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <script>$mathJaxConfig</script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, sans-serif;
+      font-size: 15px;
+      line-height: 1.7;
+      color: #1a1a1a;
+      background: transparent;
+      overflow-x: hidden;
+    }
+    svg { max-width: 100%; height: auto; display: block; margin: 8px auto; }
+    mjx-container { overflow-x: auto; max-width: 100%; }
+  </style>
+</head>
+<body>$body</body>
+</html>''';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedOpacity(
+      opacity: _loaded ? 1.0 : 0.0,
+      duration: const Duration(milliseconds: 300),
+      child: SizedBox(
+        height: _height,
+        child: WebViewWidget(controller: _controller),
+      ),
+    );
+  }
+}

@@ -26,5 +26,26 @@ class ProfileRepository with BaseRepository {
 
 
 
+  Future<ApiResult<int>> getStreak({required String token}) {
+    return safeCall(
+      () => DioClient.authenticated(token).get('/profile/streak'),
+      fromJson: (data) => (data as num).toInt(),
+    );
+  }
+
+  
+    Future<ApiResult<void>> updateSchool({
+    required String token,
+    required String school,
+  }) {
+    return safeCall(
+      () => DioClient.authenticated(token).patch(
+        '/profile/school',
+        data: {'school': school},
+      ),
+      fromJson: (_) {},
+    );
+  }
+
   
 }

@@ -3,10 +3,9 @@ import 'package:eigen_flutter/models/submission_result.dart';
 import 'package:eigen_flutter/providers/auth_provider.dart';
 import 'package:eigen_flutter/repositories/api_result.dart';
 import 'package:eigen_flutter/repositories/dailyquestions_repository.dart';
+import 'package:eigen_flutter/widgets/math_body_view.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:webview_flutter/webview_flutter.dart';
 
 // ── Provider ──────────────────────────────────────────────────────────────────
 
@@ -70,11 +69,8 @@ class _QuestionBodyState extends ConsumerState<_QuestionBody> {
   static const _green = Color(0xFF2ECC71);
   static const _red = Color(0xFFE74C3C);
 
-  late final WebViewController _webViewController;
   late final List<TextEditingController> _blankControllers;
 
-  bool _webViewLoaded = false;
-  double _webViewHeight = 200;
   bool _isSubmitting = false;
   SubmissionResult? _result;
 
@@ -85,7 +81,6 @@ class _QuestionBodyState extends ConsumerState<_QuestionBody> {
       widget.question.blanksCount,
       (_) => TextEditingController(),
     );
-    _initWebView();
   }
 
   @override
@@ -94,84 +89,13 @@ class _QuestionBodyState extends ConsumerState<_QuestionBody> {
     super.dispose();
   }
 
-  void _initWebView() {
-    _webViewController = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..addJavaScriptChannel(
-        'FlutterHeight',
-        onMessageReceived: (msg) {
-          final h = double.tryParse(msg.message);
-          if (h != null && mounted) setState(() => _webViewHeight = h + 24);
-        },
-      )
-      ..setNavigationDelegate(NavigationDelegate(
-        onPageFinished: (_) {
-          if (mounted) setState(() => _webViewLoaded = true);
-          Future.delayed(const Duration(milliseconds: 600), () {
-            _webViewController.runJavaScript(
-              "FlutterHeight.postMessage(document.body.scrollHeight.toString());",
-            );
-          });
-        },
-      ))
-      ..loadHtmlString(_buildHtml(widget.question.body));
-  }
-
-  String _buildHtml(String body) {
-    const mathJaxConfig = r"""
-      MathJax = {
-        tex: {
-          inlineMath: [['$', '$'], ['\\(', '\\)']],
-          displayMath: [['$$', '$$'], ['\\[', '\\]']]
-        },
-        svg: { fontCache: 'global' },
-        startup: {
-          ready() {
-            MathJax.startup.defaultReady();
-            MathJax.startup.promise.then(() => {
-              FlutterHeight.postMessage(document.body.scrollHeight.toString());
-            });
-          }
-        }
-      };
-    """;
-
-    return '''
-<!DOCTYPE html>
-<html>
-<head>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-  <script>$mathJaxConfig</script>
-  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, sans-serif;
-      font-size: 15px;
-      line-height: 1.7;
-      color: #1a1a1a;
-      padding: 0;
-      background: transparent;
-      overflow-x: hidden;
-    }
-    svg { max-width: 100%; height: auto; display: block; margin: 8px auto; }
-    mjx-container { overflow-x: auto; max-width: 100%; }
-  </style>
-</head>
-<body>$body</body>
-</html>
-''';
-  }
-
   Future<void> _handleSubmit() async {
-    // ── Auth guard ───────────────────────────────────────────────────
     final token = ref.read(authProvider).value?.accessToken;
     if (token == null) {
       Navigator.pushNamed(context, '/auth');
       return;
     }
 
-    // ── Numeric validation ───────────────────────────────────────────
     final List<double?> answers = [];
     for (int i = 0; i < _blankControllers.length; i++) {
       final text = _blankControllers[i].text.trim();
@@ -186,7 +110,8 @@ class _QuestionBodyState extends ConsumerState<_QuestionBody> {
               backgroundColor: _brand,
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
           );
           return;
@@ -195,7 +120,6 @@ class _QuestionBodyState extends ConsumerState<_QuestionBody> {
       }
     }
 
-    // ── Submit ───────────────────────────────────────────────────────
     setState(() {
       _isSubmitting = true;
       _result = null;
@@ -223,16 +147,15 @@ class _QuestionBodyState extends ConsumerState<_QuestionBody> {
             backgroundColor: _red,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10)),
+              borderRadius: BorderRadius.circular(10),
+            ),
           ),
         );
     }
   }
 
-  // Returns null if not yet submitted, else the BlankResult for that index
   BlankResult? _resultFor(int index) {
     if (_result == null) return null;
-    // blank_order is 1-based from the API
     return _result!.results.firstWhere(
       (r) => r.blankOrder == index + 1,
       orElse: () => _result!.results[index],
@@ -258,9 +181,10 @@ class _QuestionBodyState extends ConsumerState<_QuestionBody> {
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2)),
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
               ],
             ),
             child: Column(
@@ -270,19 +194,21 @@ class _QuestionBodyState extends ConsumerState<_QuestionBody> {
                   children: [
                     if (question.topics.isNotEmpty) ...[
                       _Chip(
-                          label: question.topics,
-                          bg: const Color(0xFFF0E6F2),
-                          fg: const Color(0xFF6B1A7A)),
+                        label: question.topics,
+                        bg: const Color(0xFFF0E6F2),
+                        fg: const Color(0xFF6B1A7A),
+                      ),
                       const SizedBox(width: 6),
                     ],
                     _DifficultyChip(difficulty: question.difficulty),
                     if (question.blanksCount > 0) ...[
                       const SizedBox(width: 6),
                       _Chip(
-                          label: '${question.blanksCount} blanks',
-                          bg: Colors.grey.shade100,
-                          fg: Colors.grey.shade600,
-                          icon: Icons.edit_outlined),
+                        label: '${question.blanksCount} blanks',
+                        bg: Colors.grey.shade100,
+                        fg: Colors.grey.shade600,
+                        icon: Icons.edit_outlined,
+                      ),
                     ],
                   ],
                 ),
@@ -290,10 +216,11 @@ class _QuestionBodyState extends ConsumerState<_QuestionBody> {
                 Text(
                   question.title,
                   style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF1A1A1A),
-                      height: 1.3),
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF1A1A1A),
+                    height: 1.3,
+                  ),
                 ),
               ],
             ),
@@ -301,7 +228,7 @@ class _QuestionBodyState extends ConsumerState<_QuestionBody> {
 
           const SizedBox(height: 12),
 
-          // ── Body WebView ──────────────────────────────────────────
+          // ── Body MathView ─────────────────────────────────────────
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(16),
@@ -310,19 +237,13 @@ class _QuestionBodyState extends ConsumerState<_QuestionBody> {
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2)),
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
               ],
             ),
-            child: AnimatedOpacity(
-              opacity: _webViewLoaded ? 1.0 : 0.0,
-              duration: const Duration(milliseconds: 300),
-              child: SizedBox(
-                height: _webViewHeight,
-                child: WebViewWidget(controller: _webViewController),
-              ),
-            ),
+            child: MathBodyView(htmlBody: widget.question.body),
           ),
 
           // ── Blanks ────────────────────────────────────────────────
@@ -331,10 +252,11 @@ class _QuestionBodyState extends ConsumerState<_QuestionBody> {
             const Text(
               'YOUR ANSWER',
               style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1.6,
-                  color: _brand),
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.6,
+                color: _brand,
+              ),
             ),
             const SizedBox(height: 10),
             ...List.generate(question.blanksCount, (i) {
@@ -359,8 +281,9 @@ class _QuestionBodyState extends ConsumerState<_QuestionBody> {
                 child: TextField(
                   controller: _blankControllers[i],
                   enabled: !submitted,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   textInputAction: i == question.blanksCount - 1
                       ? TextInputAction.done
                       : TextInputAction.next,
@@ -378,9 +301,10 @@ class _QuestionBodyState extends ConsumerState<_QuestionBody> {
                         ? 'Your answer'
                         : 'Blank ${i + 1}',
                     labelStyle: TextStyle(
-                        color: _brand.withOpacity(0.6),
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500),
+                      color: _brand.withOpacity(0.6),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
                     filled: true,
                     fillColor: fillColor,
                     suffixIcon: isCorrect == null
@@ -393,21 +317,20 @@ class _QuestionBodyState extends ConsumerState<_QuestionBody> {
                             size: 20,
                           ),
                     contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 14),
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide:
-                          BorderSide(color: borderColor, width: 1.5),
+                      borderSide: BorderSide(color: borderColor, width: 1.5),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide:
-                          const BorderSide(color: _brand, width: 1.5),
+                      borderSide: const BorderSide(color: _brand, width: 1.5),
                     ),
                     disabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide:
-                          BorderSide(color: borderColor, width: 1.5),
+                      borderSide: BorderSide(color: borderColor, width: 1.5),
                     ),
                   ),
                 ),
@@ -441,8 +364,7 @@ class _QuestionBodyState extends ConsumerState<_QuestionBody> {
                       _result!.allCorrect
                           ? Icons.emoji_events_rounded
                           : Icons.close_rounded,
-                      color:
-                          _result!.allCorrect ? _green : _red,
+                      color: _result!.allCorrect ? _green : _red,
                       size: 28,
                     ),
                     const SizedBox(width: 12),
@@ -478,7 +400,6 @@ class _QuestionBodyState extends ConsumerState<_QuestionBody> {
                 ),
               ),
               const SizedBox(height: 10),
-              // Try again button if wrong
               if (!_result!.allCorrect)
                 SizedBox(
                   width: double.infinity,
@@ -494,11 +415,16 @@ class _QuestionBodyState extends ConsumerState<_QuestionBody> {
                       side: const BorderSide(color: _brand, width: 1.5),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14)),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
                     ),
-                    child: const Text('Try Again',
-                        style: TextStyle(
-                            fontSize: 15, fontWeight: FontWeight.w700)),
+                    child: const Text(
+                      'Try Again',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
                 ),
             ],
@@ -516,7 +442,8 @@ class _QuestionBodyState extends ConsumerState<_QuestionBody> {
                     disabledBackgroundColor: _brand.withOpacity(0.5),
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14)),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
                     elevation: 0,
                   ),
                   child: _isSubmitting
@@ -524,13 +451,18 @@ class _QuestionBodyState extends ConsumerState<_QuestionBody> {
                           height: 20,
                           width: 20,
                           child: CircularProgressIndicator(
-                              color: Colors.white, strokeWidth: 2),
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
                         )
-                      : const Text('Submit Answer',
+                      : const Text(
+                          'Submit Answer',
                           style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.3)),
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
                 ),
               ),
             ],

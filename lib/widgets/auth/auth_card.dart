@@ -26,6 +26,7 @@ class _AuthCardState extends ConsumerState<AuthCard> {
 
   bool _loading = false;
   String? _error;
+  bool _obscurePassword = true;
 
   @override
   void dispose() {
@@ -43,7 +44,10 @@ class _AuthCardState extends ConsumerState<AuthCard> {
       _emailController.clear();
       _passwordController.clear();
       _usernameController.clear();
-      setState(() => _error = null);
+      setState(() {
+        _error = null;
+        _obscurePassword = true;
+      });
     }
   }
 
@@ -74,7 +78,7 @@ class _AuthCardState extends ConsumerState<AuthCard> {
         response = await _repo.signUp(email: email, password: password, username: username);
       }
       print("HERE IS THE RESPONSE OF SUPABASE");
-      
+
       String accessToken = response.session!.accessToken;
       print(accessToken);
       final result = await _profile_repo.getProfile(token: accessToken);
@@ -84,18 +88,16 @@ class _AuthCardState extends ConsumerState<AuthCard> {
           // store it in global state
           ref.read(authProvider.notifier).updateProfile(data);
           ref.read(authProvider.notifier).updateAccessToken(accessToken);
-            if (mounted) {
-              Navigator.pushNamedAndRemoveUntil(context, '/main', (_) => false);
-            }
-            
+          if (mounted) {
+            Navigator.pushNamedAndRemoveUntil(context, '/main', (_) => false);
+          }
+
         case ApiFailure(:final exception):
           if (!context.mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(exception.message)),
           );
       }
-
-    
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -165,11 +167,64 @@ class _AuthCardState extends ConsumerState<AuthCard> {
               controller: _emailController,
             ),
             const SizedBox(height: 20),
-            Field(
-              label: 'Password',
-              hint: '••••••••',
-              obscure: true,
-              controller: _passwordController,
+
+            // Password field with visibility toggle
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Password',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF374151),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: _passwordController,
+                  obscureText: _obscurePassword,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    color: Color(0xFF111827),
+                  ),
+                  decoration: InputDecoration(
+                    hintText: '••••••••',
+                    hintStyle: const TextStyle(
+                      color: Color(0xFF9CA3AF),
+                      fontSize: 15,
+                    ),
+                    suffixIcon: GestureDetector(
+                      onTap: () => setState(() => _obscurePassword = !_obscurePassword),
+                      child: Icon(
+                        _obscurePassword
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                        size: 18,
+                        color: const Color(0xFF9CA3AF),
+                      ),
+                    ),
+                    filled: true,
+                    fillColor: const Color(0xFFF9FAFB),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 14,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: Color(0xFF36093D), width: 1.5),
+                    ),
+                  ),
+                ),
+              ],
             ),
 
             // Error message
@@ -207,7 +262,7 @@ class _AuthCardState extends ConsumerState<AuthCard> {
             SizedBox(
               width: double.infinity,
               child: TextButton(
-                onPressed: _loading ? null : (){_submit(context);},
+                onPressed: _loading ? null : () { _submit(context); },
                 style: TextButton.styleFrom(
                   backgroundColor: const Color(0xFF36093D),
                   disabledBackgroundColor: const Color(0xFF36093D).withOpacity(0.5),
